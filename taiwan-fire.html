@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣版 FIRE 財務自由</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/2.1.0/chartjs-plugin-annotation.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Microsoft JhengHei', sans-serif; background-color: #f1f5f9; }
+        .toggle-checkbox:checked { right: 0; border-color: #ef4444; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #ef4444; }
+        input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+    </style>
+</head>
+<body class="pb-12 text-slate-800">
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <div class="text-center mb-8">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900">🇹🇼 台灣財務自由計算器</h1>
+        <!-- <p class="mt-2 text-slate-600">勞保/勞退/國保全納入 · 提領年齡彈性試算 · 消費通膨曲線</p> -->
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+        <div class="xl:col-span-4 space-y-5">
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center"><i class="fas fa-user-clock text-indigo-500 mr-2"></i>基本設定</h3>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="text-xs text-slate-500">目前年齡</label>
+                        <input type="number" id="age" value="43" class="w-full border rounded px-2 py-1 bg-slate-50 font-bold" onchange="runAnalysis()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500">預估壽命 (可手動)</label>
+                        <input type="number" id="lifeExpectancyInput" value="85" class="w-full border rounded px-2 py-1 bg-white border-indigo-200 text-indigo-700 font-bold" onchange="runAnalysis()">
+                    </div>
+                </div>
+                <div class="text-[10px] text-gray-400">
+                    * 系統預設 85 歲，建議輸入 90-95 歲進行長壽風險測試。
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center"><i class="fas fa-wallet text-green-600 mr-2"></i>開銷設定</h3>
+
+                <div class="mb-3">
+                    <select id="citySelect" class="w-full border rounded p-2 text-sm bg-slate-50" onchange="updateExpenseData()">
+                        <optgroup label="六都">
+                            <option value="Taipei">台北市</option>
+                            <option value="NewTaipei">新北市</option>
+                            <option value="Taoyuan">桃園市</option>
+                            <option value="Taichung">台中市</option>
+                            <option value="Tainan">台南市</option>
+                            <option value="Kaohsiung">高雄市</option>
+                        </optgroup>
+                        <optgroup label="其他縣市">
+                            <option value="Other">其他縣市(平均)</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="bg-red-50 p-3 rounded border border-red-100 mb-3" id="modeContainer">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-sm font-bold text-red-800" id="modeLabel">生存模式 (最低生活費)</label>
+                        <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                            <input type="checkbox" name="toggle" id="survivalToggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300" onchange="updateExpenseData()"/>
+                            <label for="survivalToggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs text-slate-500">每月預估總支出</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-gray-500">$</span>
+                        <input type="number" id="monthlyExpense" class="w-full border rounded p-2 pl-7 font-bold text-lg text-slate-700" value="0" onchange="runAnalysis()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-3 flex items-center"><i class="fas fa-coins text-yellow-500 mr-2"></i>資產配置</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs text-slate-500">目前總淨資產</label>
+                        <input type="number" id="assets" value="11000000" class="w-full border rounded p-2 bg-slate-50" onchange="runAnalysis()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 text-blue-600 font-bold">每年再投入金額 (直到65歲退休)</label>
+                        <input type="number" id="annualContribution" value="0" class="w-full border border-blue-200 rounded p-2 bg-blue-50 text-blue-800" placeholder="例如：120000" onchange="runAnalysis()">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-slate-500">年化報酬率 (%)</label>
+                            <input type="number" id="roi" value="4.5" class="w-full border rounded p-2" onchange="runAnalysis()">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500">預估通膨率 (%)</label>
+                            <input type="number" id="inflation" value="2.5" class="w-full border rounded p-2 text-red-600" onchange="runAnalysis()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="runAnalysis()" class="w-full bg-slate-800 text-white font-bold py-3 rounded-lg hover:bg-slate-900 transition shadow-lg">
+                更新報表
+            </button>
+        </div>
+
+        <div class="xl:col-span-8 space-y-6">
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-700 mb-4 border-b pb-2 flex justify-between">
+                    <span>🧮 退休金三大支柱設定</span>
+                    <span class="text-xs font-normal text-gray-500 mt-1">提領年齡可修改，低於法定會減額</span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-blue-800 text-sm">1. 勞保年金</h4>
+                            <input type="number" id="lbStartAge" value="65" min="60" max="70" class="w-12 text-xs border border-blue-300 rounded text-center font-bold text-blue-700" title="提領年齡" onchange="runAnalysis()">
+                            <span class="text-xs text-blue-600">歲領</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">最高60個月平均薪資 (上限45,800)</label>
+                                <input id="lbSalary" type="number" value="45800" max="45800" class="w-full text-xs border rounded p-1 bg-white" onchange="checkMaxSalary(this); runAnalysis()">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">累計年資</label>
+                                <input id="lbYears" type="number" value="15" class="w-full text-xs border rounded p-1 bg-white" onchange="runAnalysis()">
+                            </div>
+                        </div>
+                        <div class="mt-2 pt-2 border-t border-blue-200 flex justify-between">
+                            <span class="text-xs text-gray-500">預估月領:</span>
+                            <span class="text-sm font-bold text-blue-700" id="lbResult">--</span>
+                        </div>
+                        <div class="text-[10px] text-blue-400 mt-1" id="lbNote">標準額度</div>
+                    </div>
+
+                    <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-green-800 text-sm">2. 勞工退休金</h4>
+                            <input type="number" id="lpStartAge" value="60" min="60" class="w-12 text-xs border border-green-300 rounded text-center font-bold text-green-700" title="提領年齡" onchange="runAnalysis()">
+                            <span class="text-xs text-green-600">歲領</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">目前專戶累積總額</label>
+                                <input id="lpPot" type="number" value="860000" class="w-full text-xs border rounded p-1 bg-white" onchange="runAnalysis()">
+                            </div>
+                            <div class="text-[10px] text-green-600 pt-5 leading-tight">
+                                * 法定60歲可領<br>假設年化 3% 滾存
+                            </div>
+                        </div>
+                        <div class="mt-2 pt-2 border-t border-green-200 flex justify-between">
+                            <span class="text-xs text-gray-500">預估月領:</span>
+                            <span class="text-sm font-bold text-green-700" id="lpResult">--</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-orange-800 text-sm">3. 國民年金</h4>
+                            <input type="number" id="npStartAge" value="65" min="65" disabled class="w-12 text-xs border border-orange-300 bg-orange-100 rounded text-center font-bold text-gray-500" title="法定65歲">
+                            <span class="text-xs text-orange-600">歲領</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div>
+                                <label class="text-[10px] text-gray-500 block">累計納保年資 (年)</label>
+                                <input id="npYears" type="number" value="22" class="w-full text-xs border rounded p-1 bg-white" onchange="runAnalysis()">
+                            </div>
+                            <div class="text-[10px] text-orange-600 pt-1 leading-tight">
+                                * 採用 B 式 (最優式)<br>月投保額 $19,761
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-2 border-t border-orange-200 flex justify-between">
+                            <span class="text-xs text-gray-500">預估月領:</span>
+                            <span class="text-sm font-bold text-orange-700" id="npResult">--</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 h-[500px]">
+                <canvas id="fireChart"></canvas>
+            </div>
+
+            <div id="conclusion" class="hidden p-6 rounded-xl shadow-lg">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0" id="conclusionIcon"></div>
+                    <div class="ml-4">
+                        <h3 class="text-xl font-bold text-white" id="conclusionTitle"></h3>
+                        <p class="mt-2 text-white text-sm leading-relaxed opacity-90" id="conclusionText"></p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="mt-8 text-center text-xs text-gray-400">
+        資料來源：衛福部 114 年最低生活費、統計資訊網 113 年平均每人月消費、勞保局 (勞保/國保) 給付試算公式。
+    </div>
+
+</div>
+
+<script>
+    // --- 114年 (2025) 各縣市最低生活費 (Survival) 與 預估一般消費 (Normal) ---
+    const cityData = {
+        'Taipei':       { normal: 34952, survival: 24455 },
+        'NewTaipei':    { normal: 27557, survival: 20280 },
+        'Taoyuan':      { normal: 25718, survival: 20122 },
+        'Taichung':     { normal: 28754, survival: 19292 },
+        'Tainan':       { normal: 23036, survival: 18618 },
+        'Kaohsiung':    { normal: 26722, survival: 19248 },
+        'Other':        { normal: 23011, survival: 18618 }
+    };
+
+    let myChart = null;
+    const NP_INSURED_AMOUNT = 19761; // 112年起國保月投保金額
+
+    window.onload = function() {
+        updateExpenseData();
+    };
+
+    // 1. 強制限制勞保投保薪資上限
+    function checkMaxSalary(input) {
+        if (parseInt(input.value) > 45800) {
+            input.value = 45800;
+            alert("勞保最高投保薪資上限為 45,800 元");
+        }
+    }
+
+    // 2. 更新開銷
+    function updateExpenseData() {
+        const city = document.getElementById('citySelect').value;
+        const isSurvival = document.getElementById('survivalToggle').checked;
+        const data = cityData[city] || cityData['Other'];
+
+        const expense = isSurvival ? data.survival : data.normal;
+
+        // 更新 UI
+        const modeLabel = document.getElementById('modeLabel');
+        const modeContainer = document.getElementById('modeContainer');
+        if (isSurvival) {
+            modeLabel.innerText = "生存模式 (衛福部最低標準)";
+            modeContainer.className = "bg-red-50 p-3 rounded border border-red-200 mb-3";
+        } else {
+            modeLabel.innerText = "一般模式 (平均消費水準)";
+            modeContainer.className = "bg-gray-50 p-3 rounded border border-gray-200 mb-3";
+        }
+        document.getElementById('monthlyExpense').value = expense;
+        runAnalysis();
+    }
+
+    function formatMoney(n) {
+        return "$" + new Intl.NumberFormat('zh-TW').format(Math.round(n));
+    }
+
+    // 3. 核心運算
+    function runAnalysis() {
+        // --- A. 讀取基礎參數 ---
+        const currentAge = parseInt(document.getElementById('age').value);
+        const lifeExpectancy = parseInt(document.getElementById('lifeExpectancyInput').value);
+        let assets = parseFloat(document.getElementById('assets').value);
+        const annualContribution = parseFloat(document.getElementById('annualContribution').value) || 0;
+        const monthlyExpenseBase = parseFloat(document.getElementById('monthlyExpense').value);
+        const roi = parseFloat(document.getElementById('roi').value) / 100;
+        const inflation = parseFloat(document.getElementById('inflation').value) / 100;
+
+        // --- B. 讀取退休金參數 ---
+        // 1. 勞保
+        const lbStartAge = parseInt(document.getElementById('lbStartAge').value); // 提領年齡
+        const lbSalary = Math.min(parseFloat(document.getElementById('lbSalary').value), 45800);
+        const lbYears = parseFloat(document.getElementById('lbYears').value);
+
+        // 2. 勞退
+        const lpStartAge = parseInt(document.getElementById('lpStartAge').value);
+        const lpPot = parseFloat(document.getElementById('lpPot').value);
+
+        // 3. 國保
+        const npStartAge = 65; // 國保法定65歲，不可提早
+        const npYears = parseFloat(document.getElementById('npYears').value);
+
+        // --- C. 計算每月退休金 (靜態試算) ---
+
+        // C1. 勞保計算 (含展延/減給機制)
+        // 法定65歲。每提早1年減4%，每延後1年增4%。(最多+/- 20%)
+        let lbRate = 0.0155;
+        let lbBonus = 0;
+        if (lbStartAge < 65) {
+            lbBonus = (lbStartAge - 65) * 0.04; // 負值
+        } else if (lbStartAge > 65) {
+            lbBonus = (lbStartAge - 65) * 0.04; // 正值
+        }
+        // 限制範圍 -20% ~ +20%
+        if (lbBonus < -0.2) lbBonus = -0.2;
+        if (lbBonus > 0.2) lbBonus = 0.2;
+
+        const lbBaseMonthly = lbSalary * lbYears * lbRate;
+        const lbFinalMonthly = Math.round(lbBaseMonthly * (1 + lbBonus));
+
+        // 更新 UI 顯示與備註
+        document.getElementById('lbResult').innerText = formatMoney(lbFinalMonthly);
+        let lbNoteText = "標準額度";
+        if(lbBonus > 0) lbNoteText = `展延年金 (+${(lbBonus*100).toFixed(0)}%)`;
+        if(lbBonus < 0) lbNoteText = `減給年金 (${(lbBonus*100).toFixed(0)}%)`;
+        document.getElementById('lbNote').innerText = lbNoteText;
+        document.getElementById('lbNote').className = lbBonus >= 0 ? "text-[10px] text-green-600 mt-1" : "text-[10px] text-red-500 mt-1";
+
+        // C2. 勞退計算 (複利滾存至提領年齡)
+        // 假設從現在(currentAge) 滾存到 lpStartAge
+        const yearsToLp = lpStartAge - currentAge;
+        let futureLpPot = lpPot;
+        if (yearsToLp > 0) {
+            futureLpPot = lpPot * Math.pow(1.03, yearsToLp);
+        }
+        // 簡單攤提 (以平均餘命20年計, 240個月)
+        const lpFinalMonthly = Math.round(futureLpPot / 240);
+        document.getElementById('lpResult').innerText = formatMoney(lpFinalMonthly);
+
+        // C3. 國保計算 (B式：月投保金額 × 年資 × 1.3%)
+        // 有勞保年金者，通常適用B式
+        const npFinalMonthly = Math.round(NP_INSURED_AMOUNT * npYears * 0.013);
+        document.getElementById('npResult').innerText = formatMoney(npFinalMonthly);
+
+
+        // --- D. 逐年現金流模擬 ---
+        let labels = [];
+        let dataAssets = [];
+        let dataExpenses = []; // 新增：消費線數據
+
+        let simAge = currentAge;
+        let tempAssets = assets;
+        let brokeAge = null;
+        let finalAge = lifeExpectancy + 5; // 多畫5年
+
+        while (simAge <= finalAge) {
+            labels.push(simAge);
+            dataAssets.push(Math.round(tempAssets));
+
+            // 1. 計算當年度總支出 (通膨後)
+            let annualExpense = monthlyExpenseBase * 12 * Math.pow(1 + inflation, simAge - currentAge);
+            dataExpenses.push(Math.round(annualExpense)); // 紀錄消費線
+
+            // 2. 計算當年度總收入 (退休金)
+            let annualPension = 0;
+
+            // 勞保
+            if (simAge >= lbStartAge) annualPension += (lbFinalMonthly * 12);
+            // 勞退
+            if (simAge >= lpStartAge) annualPension += (lpFinalMonthly * 12);
+            // 國保
+            if (simAge >= npStartAge) annualPension += (npFinalMonthly * 12);
+
+            // 3. 額外投入 (僅限 65 歲前，或設一個工作截止齡，這裡假設到65)
+            let contribution = 0;
+            if (simAge < 65) contribution = annualContribution;
+
+            // 4. 淨現金流
+            let netCashFlow = annualPension + contribution - annualExpense;
+
+            // 5. 資產變動
+            if (tempAssets >= 0) {
+                // ((期初資產 + 淨現金流) * (1+報酬率))
+                tempAssets = ((tempAssets+ netCashFlow) * (1 + roi));
+            }
+
+            if (tempAssets <= 0) {
+                if (!brokeAge) brokeAge = simAge;
+                tempAssets = 0;
+            }
+
+            simAge++;
+        }
+
+        drawChart(labels, dataAssets, dataExpenses, currentAge, lifeExpectancy);
+        updateConclusion(brokeAge, lifeExpectancy, dataAssets[lifeExpectancy - currentAge]);
+    }
+
+    // 更新結論卡片
+    function updateConclusion(brokeAge, deathAge, finalAssets) {
+        const div = document.getElementById('conclusion');
+        const title = document.getElementById('conclusionTitle');
+        const text = document.getElementById('conclusionText');
+        const icon = document.getElementById('conclusionIcon');
+
+        div.classList.remove('hidden');
+
+        if (brokeAge && brokeAge < deathAge) {
+            div.className = "bg-red-900 p-6 rounded-xl shadow-lg";
+            icon.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-400 text-3xl mt-1"></i>';
+            title.innerText = "資產枯竭警報";
+            text.innerHTML = `資產預計在 <strong>${brokeAge} 歲</strong> 耗盡。<br>建議：<br>1. 延後勞保提領年齡 (賺取展延年金)<br>2. 增加兼職收入<br>3. 切換至生存模式開銷`;
+        } else {
+            div.className = "bg-slate-800 p-6 rounded-xl shadow-lg";
+            icon.innerHTML = '<i class="fas fa-check-circle text-green-400 text-3xl mt-1"></i>';
+            title.innerText = "財務自由達成";
+            text.innerHTML = `資產足以支撐至 <strong>${deathAge} 歲</strong>，屆時預估剩餘 <strong>${formatMoney(finalAssets)}</strong>。<br>即使消費隨通膨上升，您的退休金組合提供了良好的防禦。`;
+        }
+    }
+
+    // 繪圖 (雙Y軸)
+    function drawChart(labels, assetsData, expensesData, startAge, deathAge) {
+        const ctx = document.getElementById('fireChart').getContext('2d');
+
+        const dataLength = deathAge - startAge + 1;
+        const displayLabels = labels.slice(0, dataLength);
+
+        if (myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                // labels: labels,
+                labels: displayLabels,
+                datasets: [
+                    {
+                        label: '總淨資產',
+                        data: assetsData,
+                        borderColor: '#4f46e5', // Indigo
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        yAxisID: 'y',
+                        pointRadius: 0,
+                        pointHoverRadius: 5
+                    },
+                    {
+                        label: '年度總消費',
+                        data: expensesData,
+                        borderColor: '#ef4444', // Red
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        borderDash: [5, 5],
+                        fill: false,
+                        yAxisID: 'y', // 右軸
+                        tension: 0.4,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    annotation: {
+                        annotations: {
+                            line1: {
+                                type: 'line',
+                                //xMin: deathAge - startAge,
+                                //xMax: deathAge - startAge,
+                                xMin: dataLength-1,
+                                xMax: dataLength-1,
+
+                                borderColor: 'rgba(255, 255, 255, 0.5)',
+                                borderWidth: 2,
+                                borderDash: [2, 2],
+                                label: { display: true, content: '壽命終點', position: 'start', color: 'white', backgroundColor: 'rgba(0,0,0,0.5)' }
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + formatMoney(context.raw);
+                            },
+                            title: function(context) {
+                                return context[0].label + " 歲";
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: '總資產 (TWD)' },
+                        ticks: { callback: function(value) { return (value/10000).toFixed(0) + '萬'; } }
+                    },
+                }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
